@@ -37,13 +37,14 @@ protected:
 public:
 	CSpider();
 	virtual ~CSpider();
-
+	void Push_Position(void);
 	bool IsReady(void);
 //	bool WaitReady(float fTimeoutSecond);
 	bool WaitReady(uint32_t Timeout);
 	uint32_t ReadyTime(void);
 	void SetFootY(uint8_t Leg,float Angle);
 	void MoveTripod(TRIPOD_ID Tripod,CSpiderLeg::JOINT_ID Joint,float AngleF,float AngleM,float AngleB);
+	void MoveTripod2(TRIPOD_ID Tripod,CSpiderLeg::JOINT_ID Joint,float AngleM,float AngleB);
 	//Action
 	bool Init(void);
 	void Reset(void);
@@ -58,6 +59,7 @@ public:
 	void BodyNone(void);
 	void BodyUpDown(uint8_t Repeat_Num);
 	void MoveForward(uint8_t Repeat_Num);
+	void Push_Over(uint8_t Repeat_Num);
 	void MoveBackward(uint8_t Repeat_Num);
 	void MoveParallelR(uint8_t Repeat_Num);
 	void MoveParallelL(uint8_t Repeat_Num);

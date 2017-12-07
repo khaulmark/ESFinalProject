@@ -11,6 +11,8 @@
 #include "QueueCommand.h"
 #include "PIO_LED.h"
 #include "PIO_BUTTON.h"
+#include "ADC.h"
+#include <bitset>
 #include <time.h>
 #include <stack>
 using namespace std;
@@ -82,7 +84,9 @@ int main(int argc, char *argv[]){
     
     CQueueCommand QueueCommand;
 	stack<int> commandHistory;
-    int Command;
+	ADC adc;
+	uint32_t sensorReading0 = 0;
+	int Command;
     bool bSleep = false;
     CPIO_LED LED_PIO;
     CPIO_BUTTON BUTTON_PIO;
@@ -132,7 +136,14 @@ int main(int argc, char *argv[]){
 					Spider.WakeUp();
 					LED_PIO.SetLED(0x7f);
 				}	
-				Spider.Reset();
+				while(!commandHistory.empty()){
+					runCommand(commandHistory.top());
+					commandHistory.pop();
+					sleep(1);
+					//wait to make sure its in position
+				}
+				printf("Folding\r\n");
+				Spider.Fold();
 				LastActionTime = OS_GetTickCount();
 			}
 			else if (BUTTON_PIO.GetBUTTON()==0x1)
@@ -145,93 +156,111 @@ int main(int argc, char *argv[]){
 				Spider.DEMO_Rollover();
 				LastActionTime = OS_GetTickCount();
 			}
-
+			
 			if(!QueueCommand.IsEmpty() && QueueCommand.Pop(&Command, &Param) ){
- 				 if (bSleep){
-	 					bSleep = false;
-				    Spider.WakeUp();
-				    LED_PIO.SetLED(0x7f);
-				  }  
+					 if (bSleep){
+							bSleep = false;
+						Spider.WakeUp();
+						LED_PIO.SetLED(0x7f);
+					  }  
 
-				switch(Command){
-					case CMD_FORDWARD:
-						printf("CMD_FORDWARD\n");
-						Spider.MoveForward(1);
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_BACKWARD:
-						printf("CMD_BACKWARD\n");
-						Spider.MoveBackward(1);
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TURN_RIHGT:
-						printf("CMD_TURN_RIHGT\n");
-						Spider.RotatelRight(1);
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TURN_LEFT:
-						printf("CMD_TURN_LEFT\n");
-						Spider.RotatelLeft(1);
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TILTL:
-						printf("CMD_TILTL\n");
-						Spider.TiltLeft();
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TILTR:
-						printf("CMD_TILTR\n");
-						Spider.TiltRight();
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TILTF:
-						printf("CMD_TILTF\n");
-						Spider.TiltForward();
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TILTB:
-						printf("CMD_TILTB\n");
-						Spider.TiltBackward();
-						commandHistory.push(invertCommand(Command));
-						break;
-					case CMD_TILTN:
-						printf("CMD_TILTN\n");
-						Spider.TiltNone();
-						break;
-					case CMD_STOP:
-						printf("CMD_STOP\n");
-						Spider.Reset();
-						break;
-					case CMD_SPPED:
-						printf("CMD_SPPED %d \n",Param);
-						Spider.SetSpeed(Param);
-						break;
-					case CMD_TURN_LEFT_DGREE:
-						printf("CMD_TURN_LEFT_DGREE %d \n",Param);
-						break;
-					case CMD_TURN_RIHGT_DGREE:
-						printf("CMD_TURN_RIHGT_DGREE %d \n",Param);
-						break;
-					case CMD_Query_Version:
-						printf("CMD_Query_Version\n");
-						break;
-					case CMD_JOYSTICK:
-						printf("CMD_JOYSTICK (Param=%d)\n",Param);
-						break;
-					case CMD_ALL:
-						printf("CMD_ALL\n");
-						while(!commandHistory.empty()){
-							runCommand(commandHistory.top());
-							commandHistory.pop();
-							//wait to make sure its in position
-						}
-						QueueCommand.Clear();
-						break;
-					default:printf("Nothing\n");
-						break;
-				} // switch
+					switch(Command){
+						case CMD_FORDWARD:
+							printf("CMD_FORDWARD\n");
+							sensorReading0 = adc.GetChannel(0);
+							printf("Ch0 Sensor Reading: %u\r\n", sensorReading0);
+							
+							if (sensorReading0 < 1000){
+								Spider.MoveForward(1);
+								commandHistory.push(invertCommand(Command));
+							}
+							else {
+								Spider.Push_Position();
+								Spider.Push_Over(3);
+								while(sensorReading0 > 1000){
+									Spider.Push_Over(1);
+									sensorReading0 = adc.GetChannel(0);
+									printf("Ch0 Sensor Reading: %u\r\n", sensorReading0);
+								}
+								
+								Spider.Reset();
+							}
+							break;
+						case CMD_BACKWARD:
+							printf("CMD_BACKWARD\n");
+							Spider.MoveBackward(1);
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TURN_RIHGT:
+							printf("CMD_TURN_RIHGT\n");
+							Spider.RotatelRight(1);
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TURN_LEFT:
+							printf("CMD_TURN_LEFT\n");
+							Spider.RotatelLeft(1);
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TILTL:
+							printf("CMD_TILTL\n");
+							Spider.TiltLeft();
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TILTR:
+							printf("CMD_TILTR\n");
+							Spider.TiltRight();
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TILTF:
+							printf("CMD_TILTF\n");
+							Spider.TiltForward();
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TILTB:
+							printf("CMD_TILTB\n");
+							Spider.TiltBackward();
+							commandHistory.push(invertCommand(Command));
+							break;
+						case CMD_TILTN:
+							printf("CMD_TILTN\n");
+							Spider.TiltNone();
+							break;
+						case CMD_STOP:
+							printf("CMD_STOP\n");
+							Spider.Reset();
+							break;
+						case CMD_SPPED:
+							printf("CMD_SPPED %d \n",Param);
+							Spider.SetSpeed(Param);
+							break;
+						case CMD_TURN_LEFT_DGREE:
+							printf("CMD_TURN_LEFT_DGREE %d \n",Param);
+							break;
+						case CMD_TURN_RIHGT_DGREE:
+							printf("CMD_TURN_RIHGT_DGREE %d \n",Param);
+							break;
+						case CMD_Query_Version:
+							printf("CMD_Query_Version\n");
+							break;
+						case CMD_JOYSTICK:
+							printf("CMD_JOYSTICK (Param=%d)\n",Param);
+							break;
+						case CMD_ALL:
+							printf("CMD_REVERSE\n");
+							while(!commandHistory.empty()){
+								runCommand(commandHistory.top());
+								commandHistory.pop();
+								sleep(1);
+								//wait to make sure its in position
+							}
+							
+							QueueCommand.Clear();
+							break;
+						default:printf("Nothing\n");
+							break;
+					} // switch
 				LastActionTime = OS_GetTickCount();
-			    //printf("rx:%xh\r\n", Data8);
+				
 			}
 
 		}
@@ -347,7 +376,6 @@ int invertCommand(int command){
 			break;*/
 		default:
 			return CMD_IDLE;
-			//throw std::invalid_argument("bad case in invertCommand");
 	}
 }
 
